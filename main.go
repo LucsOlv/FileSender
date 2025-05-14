@@ -1,13 +1,22 @@
 package main
 
 import (
+	"context"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"filesender/config"
 	_ "filesender/docs" // Substitua "seu-pacote" pelo nome do seu módulo
+	"filesender/routes"
 
+	rabbitmq "filesender/messaging"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // @title           API de Upload de Arquivos
@@ -17,41 +26,54 @@ import (
 // @BasePath        /api
 
 func main() {
+	cfg := config.LoadConfig()
+
+	if cfg == nil {
+		log.Fatalf("Failed to load configuration")
+	}
 	router := gin.Default()
+	gin.SetMode(gin.DebugMode)
 
-	// Configuração do Swagger
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	// --- Suas rotas da API ---
-	apiV1 := router.Group("/api")
-	{
-		apiV1.POST("/form", uploadFiles)
-	}
-
-	router.Run(":8080")
-}
-
-// @Summary      Upload de arquivos
-// @Description  Faz upload de múltiplos arquivos
-// @Tags         uploads
-// @Accept       multipart/form-data
-// @Produce      json
-// @Param        files  formData  file  true  "Arquivos para upload (múltiplos)"
-// @Success      200    {object}  map[string]interface{}
-// @Failure      400    {string}  string  "Nenhum arquivo foi enviado"
-// @Router       /form [post]
-func uploadFiles(c *gin.Context) {
-	var form, err = c.MultipartForm()
+	publisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURI, "file_queue")
 	if err != nil {
-		c.String(http.StatusBadRequest, "Erro ao processar o formulário")
-		return
+		log.Fatalf("Failed to create RabbitMQ publisher: %v", err)
 	}
 
-	files := form.File["files"]
-	if len(files) == 0 {
-		c.String(http.StatusBadRequest, "Nenhum arquivo foi enviado.")
-		return
+	// Configurar CORS
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	router.Use(cors.New(config))
+
+	routes.SetupRoutes(router, publisher)
+
+	srv := &http.Server{
+		Addr:         ":" + cfg.ServerPort,
+		Handler:      router,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Arquivos recebidos com sucesso"})
+	// Iniciar servidor em uma goroutine
+	go func() {
+		log.Printf("Servidor iniciado na porta %s", cfg.ServerPort)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Erro ao iniciar servidor: %v", err)
+		}
+	}()
+
+	// Configurar graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Desligando servidor...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Erro ao desligar servidor: %v", err)
+	}
+
+	log.Println("Servidor encerrado com sucesso")
 }

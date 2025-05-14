@@ -30,7 +30,11 @@ const docTemplate = `{
                 "summary": "Upload de arquivos",
                 "parameters": [
                     {
-                        "type": "file",
+                        "type": "array",
+                        "items": {
+                            "type": "file"
+                        },
+                        "collectionFormat": "csv",
                         "description": "Arquivos para upload (múltiplos)",
                         "name": "files",
                         "in": "formData",
@@ -39,16 +43,28 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Retorna os nomes dos arquivos enviados",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
                         }
                     },
                     "400": {
-                        "description": "Nenhum arquivo foi enviado",
+                        "description": "Bad Request",
                         "schema": {
-                            "type": "string"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
                         }
                     }
                 }

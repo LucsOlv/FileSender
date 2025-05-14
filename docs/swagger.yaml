@@ -12,23 +12,34 @@ paths:
       - multipart/form-data
       description: Faz upload de múltiplos arquivos
       parameters:
-      - description: Arquivos para upload (múltiplos)
+      - collectionFormat: csv
+        description: Arquivos para upload (múltiplos)
         in: formData
+        items:
+          type: file
         name: files
         required: true
-        type: file
+        type: array
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Retorna os nomes dos arquivos enviados
           schema:
             additionalProperties: true
             type: object
         "400":
-          description: Nenhum arquivo foi enviado
+          description: Bad Request
           schema:
-            type: string
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       summary: Upload de arquivos
       tags:
       - uploads

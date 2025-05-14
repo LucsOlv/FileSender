@@ -16,7 +16,7 @@
 
 !README.md
 !LICENSE
-
+!.env.exemple
 # !Makefile
 
 # ...even if they are in subdirectories
