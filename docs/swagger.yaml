@@ -1,0 +1,35 @@
+basePath: /api
+host: localhost:8080
+info:
+  contact: {}
+  description: API para upload de arquivos
+  title: API de Upload de Arquivos
+  version: "1.0"
+paths:
+  /form:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Faz upload de múltiplos arquivos
+      parameters:
+      - description: Arquivos para upload (múltiplos)
+        in: formData
+        name: files
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Nenhum arquivo foi enviado
+          schema:
+            type: string
+      summary: Upload de arquivos
+      tags:
+      - uploads
+swagger: "2.0"
