@@ -2,6 +2,7 @@ package rabbitmq
 
 import (
 	"context"
+	"filesender/config"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -14,8 +15,8 @@ type Publisher struct {
 }
 
 // NewPublisher cria uma nova instância do publisher RabbitMQ
-func NewPublisher(amqpURL, queueName string) (*Publisher, error) {
-	conn, err := amqp.Dial(amqpURL)
+func NewPublisher(config *config.Config) (*Publisher, error) {
+	conn, err := amqp.Dial(config.RabbitMQURI)
 	if err != nil {
 		return nil, err
 	}
@@ -27,12 +28,12 @@ func NewPublisher(amqpURL, queueName string) (*Publisher, error) {
 	}
 
 	q, err := ch.QueueDeclare(
-		queueName, // nome
-		true,      // durável
-		false,     // delete when unused
-		false,     // exclusiva
-		false,     // no-wait
-		nil,       // argumentos
+		"file_queue", // nome
+		true,         // durável
+		false,        // delete when unused
+		false,        // exclusiva
+		false,        // no-wait
+		nil,          // argumentos
 	)
 	if err != nil {
 		ch.Close()

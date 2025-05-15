@@ -1,15 +1,10 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "API para upload de arquivos",
-        "title": "API de Upload de Arquivos",
-        "contact": {},
-        "version": "1.0"
+        "contact": {}
     },
-    "host": "localhost:8080",
-    "basePath": "/api",
     "paths": {
-        "/form": {
+        "/upload": {
             "post": {
                 "description": "Faz upload de múltiplos arquivos",
                 "consumes": [

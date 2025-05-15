@@ -2,78 +2,73 @@ package main
 
 import (
 	"context"
+	"filesender/handlers"
+	api "filesender/routes"
+	"filesender/services"
+
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"filesender/config"
-	_ "filesender/docs" // Substitua "seu-pacote" pelo nome do seu módulo
-	"filesender/routes"
+	messaging "filesender/messaging"
 
-	rabbitmq "filesender/messaging"
-
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"go.uber.org/fx"
 )
 
-// @title           API de Upload de Arquivos
-// @version         1.0
-// @description     API para upload de arquivos
-// @host            localhost:8080
-// @BasePath        /api
-
 func main() {
-	cfg := config.LoadConfig()
+	app := fx.New(
+		// Provide all components
+		fx.Provide(
+			config.LoadConfig,
+			messaging.NewPublisher,
 
-	if cfg == nil {
-		log.Fatalf("Failed to load configuration")
-	}
-	router := gin.Default()
-	gin.SetMode(gin.DebugMode)
+			// Serviços
+			services.NewFileService,
+			services.NewServices,
 
-	publisher, err := rabbitmq.NewPublisher(cfg.RabbitMQURI, "file_queue")
-	if err != nil {
-		log.Fatalf("Failed to create RabbitMQ publisher: %v", err)
-	}
+			// Controladores (todos os handlers)
+			handlers.NewControllers,
 
-	// Configurar CORS
-	config := cors.DefaultConfig()
-	config.AllowAllOrigins = true
-	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
-	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
-	router.Use(cors.New(config))
+			// Router
+			api.NewRouter,
 
-	routes.SetupRoutes(router, publisher)
+			// Gin engine
+			func() *gin.Engine {
+				return gin.Default()
+			},
+		),
+		// Register lifecycle hooks
+		fx.Invoke(registerHooks),
+	)
 
-	srv := &http.Server{
-		Addr:         ":" + cfg.ServerPort,
-		Handler:      router,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
+	app.Run()
+}
 
-	// Iniciar servidor em uma goroutine
-	go func() {
-		log.Printf("Servidor iniciado na porta %s", cfg.ServerPort)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Erro ao iniciar servidor: %v", err)
-		}
-	}()
+func registerHooks(
+	lifecycle fx.Lifecycle,
+	router *api.Router,
+	engine *gin.Engine,
+	config *config.Config,
+	rabbitMQ *messaging.Publisher,
+) {
+	lifecycle.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			// Setup routes
+			router.SetupRoutes(engine)
 
-	// Configurar graceful shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("Desligando servidor...")
+			// Start HTTP server
+			go func() {
+				if err := engine.Run(":" + config.ServerPort); err != nil && err != http.ErrServerClosed {
+					log.Fatalf("Failed to start server: %v", err)
+				}
+			}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Erro ao desligar servidor: %v", err)
-	}
-
-	log.Println("Servidor encerrado com sucesso")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			// Close RabbitMQ connection
+			return rabbitMQ.Close()
+		},
+	})
 }

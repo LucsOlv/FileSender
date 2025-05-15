@@ -6,15 +6,17 @@ import (
 	"net/http"
 
 	rabbitmq "filesender/messaging"
+	"filesender/services"
 
 	"github.com/gin-gonic/gin"
 )
 
 type UploadHandler struct {
-	publisher *rabbitmq.Publisher
+	fileService *services.FileService
+	publisher   *rabbitmq.Publisher
 }
 
-func NewUploadHandler(publisher *rabbitmq.Publisher) *UploadHandler {
+func NewUploadHandler(fileService *services.FileService, publisher *rabbitmq.Publisher) *UploadHandler {
 	return &UploadHandler{
 		publisher: publisher,
 	}
@@ -29,7 +31,7 @@ func NewUploadHandler(publisher *rabbitmq.Publisher) *UploadHandler {
 // @Success      200    {object}  map[string]interface{} "Retorna os nomes dos arquivos enviados"
 // @Failure      400    {object}  map[string]string
 // @Failure      500    {object}  map[string]string
-// @Router       /form [post]
+// @Router       /upload [post]
 func (h *UploadHandler) HandleUpload(c *gin.Context) {
 	// Adicione logs para debug
 	log.Println("Recebendo requisição de upload")

@@ -1,40 +1,33 @@
-package routes
+package api
 
 import (
 	"filesender/docs"
 	"filesender/handlers"
-
-	rabbitmq "filesender/messaging"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func SetupRoutes(router *gin.Engine, publisher *rabbitmq.Publisher) {
-	uploadHandler := handlers.NewUploadHandler(publisher)
+// Router gerencia todas as rotas da aplicação
+type Router struct {
+	controllers *handlers.Controllers
+}
 
+// NewRouter cria um novo router
+func NewRouter(controllers *handlers.Controllers) *Router {
+	return &Router{
+		controllers: controllers,
+	}
+}
+
+// SetupRoutes configura todas as rotas da aplicação
+func (r *Router) SetupRoutes(engine *gin.Engine) {
+	api := engine.Group("/api")
 	// Configuração do Swagger
 	docs.SwaggerInfo.BasePath = "/api"
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	api.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Endpoint de teste
-	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "pong",
-		})
-	})
-
-	// Rotas da API
-	apiV1 := router.Group("/api")
-	{
-		// Endpoint de teste dentro do grupo API
-		apiV1.GET("/ping", func(c *gin.Context) {
-			c.JSON(200, gin.H{
-				"message": "api pong",
-			})
-		})
-
-		apiV1.POST("/form", uploadHandler.HandleUpload)
-	}
+	// Rotas de arquivos
+	api.POST("/upload", r.controllers.File.HandleUpload)
 }

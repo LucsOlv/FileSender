@@ -1,12 +1,7 @@
-basePath: /api
-host: localhost:8080
 info:
   contact: {}
-  description: API para upload de arquivos
-  title: API de Upload de Arquivos
-  version: "1.0"
 paths:
-  /form:
+  /upload:
     post:
       consumes:
       - multipart/form-data
